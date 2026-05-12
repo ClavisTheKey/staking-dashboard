@@ -229,12 +229,20 @@ export const ATPStakingOverviewBreakdownSection = ({
                       providerTakeRate: d.providerTakeRate,
                       providerRewardsRecipient: d.providerRewardsRecipient as `0x${string}`,
                       rewards: d.rewards,
+                      rollupRewardsByRollup: d.rollupRewardsByRollup,
+                      splitContractBalance: d.splitContractBalance,
+                      providerName: d.providerName,
+                      providerId: d.providerId,
                     })),
                     ...filteredErc20Delegations.map(d => ({
                       splitContract: d.splitContract as `0x${string}`,
                       providerTakeRate: d.providerTakeRate,
                       providerRewardsRecipient: d.providerRewardsRecipient as `0x${string}`,
                       rewards: d.rewards,
+                      rollupRewardsByRollup: d.rollupRewardsByRollup,
+                      splitContractBalance: d.splitContractBalance,
+                      providerName: d.providerName,
+                      providerId: d.providerId,
                     }))
                   ]}
                   onSuccess={handleRefetchAll}

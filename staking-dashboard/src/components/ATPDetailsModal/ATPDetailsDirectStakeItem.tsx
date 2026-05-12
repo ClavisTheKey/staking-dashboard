@@ -52,7 +52,8 @@ export const ATPDetailsDirectStakeItem = ({ stake, stakerAddress, rollupVersion,
     activationThreshold,
     ejectionThreshold,
     healthPercentage,
-    slashCount,
+    lossAmount,
+    lossPercentage,
     isAtRisk,
     isCritical,
     isLoading: isLoadingHealth
@@ -94,7 +95,7 @@ export const ATPDetailsDirectStakeItem = ({ stake, stakerAddress, rollupVersion,
                   isLoading={isLoadingStatus}
                   isUnstaked={isUnstaked}
                   isInQueue={isInQueue}
-                  slashCount={slashCount}
+                  lossPercentage={lossPercentage}
                   isAtRisk={isAtRisk}
                 />
               )}
@@ -345,7 +346,8 @@ export const ATPDetailsDirectStakeItem = ({ stake, stakerAddress, rollupVersion,
                       activationThreshold={activationThreshold}
                       ejectionThreshold={ejectionThreshold}
                       healthPercentage={healthPercentage}
-                      slashCount={slashCount}
+                      lossAmount={lossAmount}
+                      lossPercentage={lossPercentage}
                       isAtRisk={isAtRisk}
                       isCritical={isCritical}
                       isLoading={isLoadingHealth}
