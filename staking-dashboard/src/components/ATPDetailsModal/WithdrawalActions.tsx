@@ -14,8 +14,22 @@ import {
 interface WithdrawalActionsProps {
   stakerAddress: Address;
   attesterAddress: Address;
-  rollupVersion: bigint;
+  /**
+   * Rollup contract that currently holds the stake's live record (i.e.
+   * `effectiveRollup` from the dashboard's probe — NOT the deposit-time
+   * rollup). Finalize is sent direct to this address, sidestepping the
+   * Staker's long-standing British-spelling forwarder bug (see
+   * `useFinalizeWithdraw.ts`).
+   */
   rollupAddress: Address;
+  /**
+   * On-chain version of the rollup that currently holds the stake's live
+   * record. Used ONLY by initiate (which routes through Staker and needs
+   * `version` to dispatch to the right rollup). `undefined` while
+   * `useRollupVersionFor` is still resolving — initiate is disabled
+   * until it settles. Finalize doesn't use it.
+   */
+  rollupVersion: bigint | undefined;
   status: number | undefined;
   canFinalize: boolean;
   actualUnlockTime?: bigint;
@@ -39,8 +53,8 @@ interface WithdrawalActionsProps {
 export const WithdrawalActions = ({
   stakerAddress,
   attesterAddress,
-  rollupVersion,
   rollupAddress,
+  rollupVersion,
   status,
   canFinalize,
   actualUnlockTime,
@@ -67,10 +81,22 @@ export const WithdrawalActions = ({
 
   const isMATP = atpType === "MATP";
   const isMilestoneGated = isMATP && !canWithdraw;
+  // Initiate routes through the Staker, which dispatches to
+  // `Rollup(version).initiateWithdraw(attester)` — so the version must
+  // be resolved before we can build a valid cart entry. While
+  // `useRollupVersionFor(effectiveRollup)` is in-flight, block initiate
+  // so a stale/placeholder version can't slip through.
+  //
+  // Finalize is NOT gated on version. It calls `Rollup.finalizeWithdraw`
+  // directly on `rollupAddress` (= effectiveRollup), bypassing the
+  // Staker's long-standing finaliseWithdraw spelling-bug forwarder.
+  // No version argument exists on that signature.
+  const isVersionResolving = rollupVersion === undefined;
 
   const canInitiateUnstake =
     (status === SequencerStatus.VALIDATING || status === SequencerStatus.ZOMBIE) &&
-    !isMilestoneGated;
+    !isMilestoneGated &&
+    !isVersionResolving;
   const canFinalizeWithdrawNow = canFinalize && !isMilestoneGated;
 
   // Pre-build the cart entries used by the click handlers. We do NOT use
@@ -78,12 +104,26 @@ export const WithdrawalActions = ({
   // when underlying data (rollup version, attester) refetches mid-render and
   // causes duplicate cart entries. Use the stable stepGroupIdentifier from
   // the entry's metadata instead (see `checkStepGroupInQueue`).
+  //
+  // Initiate's version field gets a 0n placeholder while resolving; the
+  // disabled button gates it from being added. Once `rollupVersion`
+  // resolves, the entry is rebuilt with the correct value. The queued-
+  // state check is keyed on `(attester, stakerAddress)` not version, so
+  // the placeholder doesn't flicker the queued state.
+  const safeRollupVersion = rollupVersion ?? 0n;
   const initiateEntry = buildStakerInitiateWithdrawEntry({
     stakerAddress,
-    version: rollupVersion,
+    version: safeRollupVersion,
     attester: attesterAddress,
     providerName,
   });
+  // Finalize goes direct to the Rollup at `rollupAddress` (=
+  // `effectiveRollup` per the dashboard's chain probe). This bypasses
+  // the Staker's `finalizeWithdraw` forwarder, which internally calls
+  // the non-existent `Rollup.finaliseWithdraw` (British spelling) and
+  // reverts — a load-bearing workaround in place since the dashboard's
+  // initial commit. Multi-rollup correctness comes from the caller
+  // passing the right `rollupAddress`, not from going through Staker.
   const finalizeEntry = buildRollupFinalizeWithdrawEntry({
     rollupAddress,
     attester: attesterAddress,
@@ -101,6 +141,10 @@ export const WithdrawalActions = ({
       openCart();
       return;
     }
+    // Defence-in-depth: the button is `disabled` while
+    // `isVersionResolving`, but a stray click during a re-render race
+    // shouldn't slip through with the placeholder version.
+    if (isVersionResolving) return;
     addTransaction(initiateEntry, { preventDuplicate: true });
     onSuccess?.();
     openCart();
@@ -154,7 +198,13 @@ export const WithdrawalActions = ({
                 ? "bg-aqua/20 border border-aqua/40 text-aqua hover:bg-aqua/30"
                 : "bg-aqua text-ink hover:bg-aqua/90"
             }`}
-            title={isMilestoneGated ? milestoneBlockError || undefined : undefined}
+            title={
+              isVersionResolving
+                ? "Resolving rollup version…"
+                : isMilestoneGated
+                ? milestoneBlockError || undefined
+                : undefined
+            }
           >
             {isInitiateQueued ? (
               <span className="flex items-center justify-center gap-1.5">
