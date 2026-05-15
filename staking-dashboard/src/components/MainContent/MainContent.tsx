@@ -6,6 +6,7 @@ import { WalletConnectGuard } from "@/components/WalletConnectGuard"
 import { WalletConnectionAlertModal } from "../WalletConnectionAlert"
 import { TermsAcceptanceModal } from "@/components/TermsAcceptanceModal/TermsAcceptanceModal"
 import { useTermsModal } from "@/contexts/TermsModalContext"
+import { useConnectedOperatorIdentities } from "@/hooks/operator"
 
 /**
  * Main content area with tab navigation
@@ -18,9 +19,17 @@ export const MainContent = () => {
   const [isInitialLoad, setIsInitialLoad] = useState(true)
   const [animateContent, setAnimateContent] = useState(false)
 
+  const { all: operatorIdentities, isLoading: isLoadingOperator, hasError: operatorDetectionError } = useConnectedOperatorIdentities()
+  // When the indexer query fails we can't prove they aren't an operator. Show
+  // the tab in that uncertain state so a real operator isn't locked out of
+  // the page (where they can retry). False positives for non-operators are
+  // fine — they'll see the error banner explaining why the list is empty.
+  const isOperator = !isLoadingOperator && (operatorIdentities.length > 0 || operatorDetectionError)
+
   const getActiveTab = () => {
     if (location.pathname === "/" || location.pathname === "/my-position") return "my-position"
     if (location.pathname === "/stake" || location.pathname === "/providers" || location.pathname.startsWith("/providers/") || location.pathname === "/register-validator") return "stake"
+    if (location.pathname === "/operator") return "operator"
     return "my-position"
   }
 
@@ -132,6 +141,22 @@ export const MainContent = () => {
                 }`}></div>
               {applyHeroItalics("Stake")}
             </Link>
+            {isOperator && (
+              <Link
+                to="/operator"
+                className={`relative px-4 sm:px-6 md:px-8 py-3 sm:py-4 font-arizona-text text-base sm:text-xl md:text-2xl font-light transition-colors whitespace-nowrap min-h-[48px] sm:min-h-[56px] flex items-center ${activeTab === 'operator'
+                  ? 'text-parchment'
+                  : 'text-chartreuse/80 hover:text-chartreuse'
+                  }`}
+              >
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-px h-1/2 bg-parchment/20"></div>
+                <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-2/3 transition-colors ${activeTab === 'operator'
+                  ? 'bg-chartreuse'
+                  : 'bg-transparent group-hover:bg-parchment/30'
+                  }`}></div>
+                {applyHeroItalics("Operator Tools")}
+              </Link>
+            )}
           </div>
         </div>
 
